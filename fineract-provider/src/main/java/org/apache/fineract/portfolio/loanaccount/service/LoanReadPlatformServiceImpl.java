@@ -1836,7 +1836,8 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                 SELECT l.id
                 FROM m_loan l
                 INNER JOIN m_loan_repayment_schedule mr ON mr.loan_id = l.id
-                LEFT JOIN m_loan_disbursement_detail dd ON dd.loan_id=l.id AND dd.disbursedon_date IS NULL
+                LEFT JOIN m_loan_disbursement_detail dd
+                    ON dd.loan_id=l.id AND dd.disbursedon_date IS NULL AND dd.is_reversed = FALSE
                 -- for past due interest recalculation
                 LEFT JOIN m_loan_recalculation_details rcd ON rcd.loan_id = l.id
                 -- For Floating rate changes
@@ -1847,11 +1848,10 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                 LEFT JOIN m_loan_reschedule_request lrr ON lrr.loan_id = l.id
                 -- this is to identify the applicable rates when base rate is changed
                 LEFT JOIN m_floating_rates bfr ON bfr.is_base_lending_rate = TRUE
-                LEFT JOIN m_floating_rates_periods bfrp ON bfr.id = bfrp.floating_rates_id AND bfrp.created_date >= ?
+                LEFT JOIN m_floating_rates_periods bfrp ON bfr.id = bfrp.floating_rates_id AND bfrp.created_on_business_date >= ?
                 WHERE l.loan_status_id = ?
                   AND l.is_npa = FALSE
                   AND l.is_charged_off = FALSE
-                  AND dd.is_reversed = FALSE
                   AND (
                         (l.interest_recalculation_enabled = TRUE
                             AND (l.interest_recalcualated_on IS NULL OR l.interest_recalcualated_on <> ?)
@@ -1861,7 +1861,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                         -- float rate changes
                         (fr.is_active = TRUE
                             AND frp.is_active = TRUE
-                            AND (frp.created_date >= ?
+                            AND (frp.created_on_business_date >= ?
                                  OR (bfrp.id IS NOT NULL
                                      AND frp.is_differential_to_base_lending_rate = TRUE
                                      AND frp.from_date >= bfrp.from_date))
@@ -1903,7 +1903,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                 LEFT JOIN m_loan_reschedule_request lrr ON lrr.loan_id = l.id
                 -- this is to identify the applicable rates when base rate is changed
                 LEFT JOIN m_floating_rates bfr ON bfr.is_base_lending_rate = TRUE
-                LEFT JOIN m_floating_rates_periods bfrp ON bfr.id = bfrp.floating_rates_id AND bfrp.created_date >= ?
+                LEFT JOIN m_floating_rates_periods bfrp ON bfr.id = bfrp.floating_rates_id AND bfrp.created_on_business_date >= ?
                 WHERE l.loan_status_id = ?
                     AND l.is_npa = FALSE
                     AND l.is_charged_off = FALSE
@@ -1915,7 +1915,7 @@ public class LoanReadPlatformServiceImpl implements LoanReadPlatformService, Loa
                         OR
                          (fr.is_active = TRUE
                              AND frp.is_active = TRUE
-                             AND (frp.created_date >= ?
+                             AND (frp.created_on_business_date >= ?
                                   OR (bfrp.id IS NOT NULL
                                       AND frp.is_differential_to_base_lending_rate = TRUE
                                       AND frp.from_date >= bfrp.from_date))

@@ -22,10 +22,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import org.apache.fineract.infrastructure.core.domain.AbstractAuditableWithUTCDateTimeCustom;
+import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.portfolio.floatingrates.data.FloatingRateDTO;
 import org.apache.fineract.portfolio.floatingrates.data.FloatingRatePeriodData;
 
@@ -48,6 +50,9 @@ public class FloatingRatePeriod extends AbstractAuditableWithUTCDateTimeCustom<L
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
+
+    @Column(name = "created_on_business_date")
+    private LocalDate createdOnBusinessDate;
 
     /*
      * Deprecated since common Auditable fields were introduced. Columns and data left untouched to help migration.
@@ -98,6 +103,17 @@ public class FloatingRatePeriod extends AbstractAuditableWithUTCDateTimeCustom<L
 
     public LocalDate fetchFromDate() {
         return fromDate;
+    }
+
+    public LocalDate getCreatedOnBusinessDate() {
+        return this.createdOnBusinessDate;
+    }
+
+    @PrePersist
+    void stampCreatedOnBusinessDate() {
+        if (this.createdOnBusinessDate == null) {
+            this.createdOnBusinessDate = DateUtils.getBusinessLocalDate();
+        }
     }
 
     public FloatingRatePeriodData toData(final FloatingRateDTO floatingRateDTO) {
