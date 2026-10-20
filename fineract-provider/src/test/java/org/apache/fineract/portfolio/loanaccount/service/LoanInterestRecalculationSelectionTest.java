@@ -57,24 +57,25 @@ class LoanInterestRecalculationSelectionTest {
     @BeforeAll
     static void createSchema() {
         jdbcTemplate = new JdbcTemplate(new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
-        jdbcTemplate.execute("""
-                CREATE TABLE m_office (id BIGINT PRIMARY KEY, hierarchy VARCHAR(100));
-                CREATE TABLE m_client (id BIGINT PRIMARY KEY, office_id BIGINT);
-                CREATE TABLE m_loan (id BIGINT PRIMARY KEY, client_id BIGINT, product_id BIGINT, loan_status_id INT,
-                    is_npa BOOLEAN, is_charged_off BOOLEAN, is_floating_interest_rate BOOLEAN,
-                    interest_recalculation_enabled BOOLEAN, interest_recalcualated_on DATE);
-                CREATE TABLE m_loan_repayment_schedule (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, duedate DATE, completed_derived BOOLEAN);
-                CREATE TABLE m_loan_disbursement_detail (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, expected_disburse_date DATE,
-                    disbursedon_date DATE, is_reversed BOOLEAN);
-                CREATE TABLE m_loan_recalculation_details (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, disallow_interest_calc_on_past_due BOOLEAN);
-                CREATE TABLE m_loan_reschedule_request (id BIGSERIAL PRIMARY KEY, loan_id BIGINT);
-                CREATE TABLE m_product_loan_floating_rates (loan_product_id BIGINT, floating_rates_id BIGINT);
-                CREATE TABLE m_floating_rates (id BIGINT PRIMARY KEY, is_base_lending_rate BOOLEAN, is_active BOOLEAN);
-                CREATE TABLE m_floating_rates_periods (id BIGSERIAL PRIMARY KEY, floating_rates_id BIGINT, from_date DATE,
-                    is_differential_to_base_lending_rate BOOLEAN, is_active BOOLEAN, created_date TIMESTAMP, created_on_business_date DATE);
-                INSERT INTO m_office VALUES (1, '.');
-                INSERT INTO m_client VALUES (1, 1);
-                """);
+        jdbcTemplate.execute(
+                """
+                        CREATE TABLE m_office (id BIGINT PRIMARY KEY, hierarchy VARCHAR(100));
+                        CREATE TABLE m_client (id BIGINT PRIMARY KEY, office_id BIGINT);
+                        CREATE TABLE m_loan (id BIGINT PRIMARY KEY, client_id BIGINT, product_id BIGINT, loan_status_id INT,
+                            is_npa BOOLEAN, is_charged_off BOOLEAN, is_floating_interest_rate BOOLEAN,
+                            interest_recalculation_enabled BOOLEAN, interest_recalcualated_on DATE);
+                        CREATE TABLE m_loan_repayment_schedule (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, duedate DATE, completed_derived BOOLEAN);
+                        CREATE TABLE m_loan_disbursement_detail (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, expected_disburse_date DATE,
+                            disbursedon_date DATE, is_reversed BOOLEAN);
+                        CREATE TABLE m_loan_recalculation_details (id BIGSERIAL PRIMARY KEY, loan_id BIGINT, disallow_interest_calc_on_past_due BOOLEAN);
+                        CREATE TABLE m_loan_reschedule_request (id BIGSERIAL PRIMARY KEY, loan_id BIGINT);
+                        CREATE TABLE m_product_loan_floating_rates (loan_product_id BIGINT, floating_rates_id BIGINT);
+                        CREATE TABLE m_floating_rates (id BIGINT PRIMARY KEY, is_base_lending_rate BOOLEAN, is_active BOOLEAN);
+                        CREATE TABLE m_floating_rates_periods (id BIGSERIAL PRIMARY KEY, floating_rates_id BIGINT, from_date DATE,
+                            is_differential_to_base_lending_rate BOOLEAN, is_active BOOLEAN, created_date TIMESTAMP, created_on_business_date DATE);
+                        INSERT INTO m_office VALUES (1, '.');
+                        INSERT INTO m_client VALUES (1, 1);
+                        """);
     }
 
     @BeforeEach
@@ -166,8 +167,10 @@ class LoanInterestRecalculationSelectionTest {
     }
 
     private static void period(long rateId, LocalDate fromDate, boolean differential, LocalDate createdOnBusinessDate) {
-        jdbcTemplate.update("INSERT INTO m_floating_rates_periods (floating_rates_id, from_date, is_differential_to_base_lending_rate,"
-                + " is_active, created_on_business_date) VALUES (?, ?, ?, TRUE, ?)", rateId, fromDate, differential, createdOnBusinessDate);
+        jdbcTemplate.update(
+                "INSERT INTO m_floating_rates_periods (floating_rates_id, from_date, is_differential_to_base_lending_rate,"
+                        + " is_active, created_on_business_date) VALUES (?, ?, ?, TRUE, ?)",
+                rateId, fromDate, differential, createdOnBusinessDate);
     }
 
     private static void product(long productId, long rateId) {

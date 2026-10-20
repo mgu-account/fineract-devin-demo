@@ -55,31 +55,37 @@ public class FloatingRateChangeRecalculationJobTest extends FeignLoanTestBase {
     public void recalculateInterestJobRepricesLoanAfterFloatingRateChange() {
         runAt("01 February 2024", () -> {
             final Long floatingRateId = createFloatingRate();
-            final Integer loanProductId = createFloatingRateLoanProduct(floatingRateId, accountHelper.createAssetAccount("frJobAsset"),
-                    accountHelper.createIncomeAccount("frJobIncome"), accountHelper.createExpenseAccount("frJobExpense"),
-                    accountHelper.createLiabilityAccount("frJobOverpayment"));
+            final Integer loanProductId = createFloatingRateLoanProduct(floatingRateId, "frJob");
             final Long clientId = createClient();
-
             updateBusinessDate("15 March 2024");
             final Long loanId = createAndDisburseFloatingRateLoan(clientId, loanProductId, "15 March 2024");
             final Map<Integer, BigDecimal> initialDue = totalDueByPeriod(loanId);
 
-            updateBusinessDate("20 March 2024");
-            ok(() -> fineractClient().floatingRates().updateFloatingRate(floatingRateId,
-                    new FloatingRateUpdateRequest().ratePeriods(List.of(ratePeriod("01 April 2024", CHANGED_INTEREST_RATE)))));
+            changeRateFromFirstOfApril(floatingRateId, "20 March 2024");
             assertEquals(initialDue, totalDueByPeriod(loanId), "A rate change alone must not regenerate the schedule");
 
             updateBusinessDate("21 March 2024");
             schedulerHelper.executeAndAwaitJob(RECALCULATE_INTEREST_JOB);
 
             final Map<Integer, BigDecimal> repricedDue = totalDueByPeriod(loanId);
-            for (Map.Entry<Integer, BigDecimal> entry : repricedDue.entrySet()) {
-                if (entry.getKey() > 1) {
-                    assertTrue(entry.getValue().compareTo(initialDue.get(entry.getKey())) < 0, "Period " + entry.getKey() + " due "
-                            + entry.getValue() + " should drop below " + initialDue.get(entry.getKey()) + " after the job reprices the loan");
-                }
-            }
+            assertRepriced(initialDue, repricedDue);
+            assertEquals(0, new BigDecimal("888.49").compareTo(initialDue.get(2)), "EMI at 12%");
+            assertEquals(0, new BigDecimal("860.66").compareTo(repricedDue.get(2)), "EMI once 6% applies from 01 April 2024");
         });
+    }
+
+    private void changeRateFromFirstOfApril(Long floatingRateId, String businessDate) {
+        updateBusinessDate(businessDate);
+        ok(() -> fineractClient().floatingRates().updateFloatingRate(floatingRateId,
+                new FloatingRateUpdateRequest().ratePeriods(List.of(ratePeriod("01 April 2024", CHANGED_INTEREST_RATE)))));
+    }
+
+    private static void assertRepriced(Map<Integer, BigDecimal> initialDue, Map<Integer, BigDecimal> repricedDue) {
+        final int lastPeriod = repricedDue.size();
+        for (int period = 2; period < lastPeriod; period++) {
+            assertTrue(repricedDue.get(period).compareTo(initialDue.get(period)) < 0, "Period " + period + " due " + repricedDue.get(period)
+                    + " should drop below " + initialDue.get(period) + " once the 6% rate applies");
+        }
     }
 
     private Map<Integer, BigDecimal> totalDueByPeriod(Long loanId) {
@@ -106,7 +112,10 @@ public class FloatingRateChangeRecalculationJobTest extends FeignLoanTestBase {
         return response.getResourceId();
     }
 
-    private Integer createFloatingRateLoanProduct(Long floatingRateId, Account... accounts) {
+    private Integer createFloatingRateLoanProduct(Long floatingRateId, String accountPrefix) {
+        final Account[] accounts = { accountHelper.createAssetAccount(accountPrefix + "Asset"),
+                accountHelper.createIncomeAccount(accountPrefix + "Income"), accountHelper.createExpenseAccount(accountPrefix + "Expense"),
+                accountHelper.createLiabilityAccount(accountPrefix + "Overpayment") };
         final HashMap<String, Object> loanProductMap = new LoanProductTestBuilder().withPrincipal("10000").withNumberOfRepayments("12")
                 .withRepaymentTypeAsMonth().withRepaymentAfterEvery("1").withInterestTypeAsDecliningBalance()
                 .withAmortizationTypeAsEqualInstallments().withInterestCalculationPeriodTypeAsRepaymentPeriod(true)
@@ -129,9 +138,9 @@ public class FloatingRateChangeRecalculationJobTest extends FeignLoanTestBase {
     }
 
     private Long createAndDisburseFloatingRateLoan(Long clientId, Integer loanProductId, String date) {
-        final Long loanId = applyForLoan(LoanRequestBuilders
-                .legacyIndividualApplication(clientId, loanProductId.longValue(), "10000", 12, null, date).isFloatingInterestRate(true)
-                .interestRateDifferential(BigDecimal.ZERO));
+        final Long loanId = applyForLoan(
+                LoanRequestBuilders.legacyIndividualApplication(clientId, loanProductId.longValue(), "10000", 12, null, date)
+                        .isFloatingInterestRate(true).interestRateDifferential(BigDecimal.ZERO));
         approveLoan(loanId, approveLoanRequest(10000.0, date));
         disburseLoanWithNetDisbursalAmount(loanId, date, "10000");
         return loanId;
